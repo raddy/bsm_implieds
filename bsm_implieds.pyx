@@ -50,16 +50,16 @@ def implied_fut(double guess, double price, double strike, double t, double rf, 
     return np.NaN
 
 #quick functions to go back and from call tvs to vols and vv.
-def vols_to_tvs(vs,ks,spot,tte,ir=.03,type=1):
+def vols_to_tvs(vs,ks,spot,tte,ir=.03,cp=1):
     res = []
     for v,k in zip(vs,ks):
-        res.append(bs_tv(spot,k,tte,v,ir,1))
+        res.append(bs_tv(spot,k,tte,v,ir,cp))
     return res
 
-def tvs_to_vols(tvs,ks,spot,tte,ir=.03,type=1):
+def tvs_to_vols(tvs,ks,spot,tte,ir=.03,cp=1):
     res = []
     for tv,k in zip(tvs,ks):
-        res.append(implied_vol(spot,tv,k,tte,ir,1))
+        res.append(implied_vol(spot,tv,k,tte,ir,cp))
     return res
 
 def vol_cost_function(predicted_vols,observed_vols,bid_ask_tick_widths,market_vegas):
