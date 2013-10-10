@@ -4,6 +4,9 @@ import pandas as pd
 from libc.math cimport exp, sqrt, pow, log, erf, abs, M_PI
 cimport cython
 
+ctypedef np.double_t DTYPE_t
+
+
 cdef extern from "black.h":
     double tv(double s, double k, double t,double v, double rf, double cp)
     double vega(double s, double k, double t,double v, double rf, double cp)
@@ -49,6 +52,7 @@ def implied_fut(double guess, double price, double strike, double t, double rf, 
         underlying_guess += diff / delt
     return np.NaN
 
+
 #quick functions to go back and from call tvs to vols and vv.
 def vols_to_tvs(vs,ks,spot,tte,ir=.03,cp=1):
     res = []
@@ -67,3 +71,26 @@ def vol_cost_function(predicted_vols,observed_vols,bid_ask_tick_widths,market_ve
     step1 =  pd.Series(weights * (predicted_vols-observed_vols)).dropna() 
     return step1.abs().sum()
 
+@cython.cdivision(True)
+@cython.boundscheck(False)
+def implied_futs(np.ndarray[DTYPE_t, ndim=1] prices,np.ndarray[DTYPE_t, ndim=1] strikes,
+    np.ndarray[DTYPE_t, ndim=1] vols, np.ndarray[DTYPE_t, ndim=1] ttes, np.ndarray[long, ndim=1] types,
+    double rf,double guess):
+    
+    cdef long price_len = prices.shape[0], strike_len = strikes.shape[0], vols_len = vols.shape[0], tte_len = ttes.shape[0],type_len = types.shape[0],i=0
+    assert(price_len==strike_len)
+    assert(strike_len==vols_len)
+    assert(vols_len==tte_len)
+    assert(tte_len==type_len)
+
+    cdef np.ndarray[DTYPE_t, ndim=1] res = np.zeros(price_len, dtype=np.double) * np.NaN
+
+
+    for i in range(0,price_len):
+        if (prices[i]>=0) and  (vols[i]>0) and types[i]!=0:
+            res[i] = implied_fut(guess,prices[i],strikes[i],ttes[i],rf,vols[i],types[i])
+        elif prices[i]>=0 and types[i]==0:
+            res[i] = prices[i]
+        else:
+            res[i] = np.NaN
+    return res    
