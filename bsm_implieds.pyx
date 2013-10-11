@@ -300,4 +300,4 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
     top5bid_symbols_df = pd.DataFrame(top5bid_symbols,columns=['BidSymbol1','BidSymbol2','BidSymbol3','BidSymbol4','BidSymbol5'])
     top5ask_symbols_df = pd.DataFrame(top5ask_symbols,columns=['AskSymbol1','AskSymbol2','AskSymbol3','AskSymbol4','AskSymbol5'])
     df =  top5bid_symbols_df.join(top5bids_df).join(top5ask_symbols_df).join(top5asks_df)
-    return df.fillna(method='ffill').drop_duplicates()
+    return df.fillna(method='ffill')
