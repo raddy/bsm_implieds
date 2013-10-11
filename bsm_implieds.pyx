@@ -18,7 +18,7 @@ cdef inline int trade_dir(double prev_bid,double trade_price):
     if trade_price>prev_bid:
         return 1
     return -1
-    
+
 
 def bs_tv(double s, double k, double t,double v, double rf, double cp):
     return tv(s,k,t,v,rf,cp)
@@ -245,7 +245,7 @@ def cy_parse_dict(some_res_dict):
             topasks.feed((stuff[4]*-1, (k,stuff[1])))
         if stuff[6]>0:
             topasks.feed((stuff[6]*-1, (k,stuff[1])))
-    return [topbids.result()[::-1],topasks.result()]  
+    return [topbids.result(),topasks.result()]  
 
 #assumes you pass in ONLY KOPSI message 
 #works on ONLY 2 level books
@@ -258,7 +258,8 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
         double approx_delta
         object sym
         dict last_info = {}
-        long throwout_count = 0,null_count=0
+        dict last_md = {}
+        long throwout_count = 0,null_count=0, redundant_count = 0
         np.ndarray[DTYPE_t, ndim=2] top5bids = np.zeros([sym_len,10],dtype=np.double) * np.NaN
         np.ndarray[object,ndim=2] top5bid_symbols = np.zeros([sym_len,5],dtype=object) * np.NaN
         np.ndarray[DTYPE_t, ndim=2] top5asks = np.zeros([sym_len,10],dtype=np.double) * np.NaN
@@ -276,8 +277,12 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
             last_info[sym] = [np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN]
             throwout_count+=1
             continue
+        if np.allclose(last_md[sym],[bid1[i],bid1s[i],ask1[i],ask1s[i]]):
+            redundant_count+=1
+            continue
         last_info[sym] = implied_info(types[i],bid1[i],bid1s[i],bid2[i],bid2s[i],ask1[i],ask1s[i],ask2[i],ask2s[i],synthetics[i],
             basis[i],vols[i],ttes[i],strikes[i],approx_delta,rf,guess)
+        last_md[sym] = [bid1[i],bid1s[i],ask1[i],ask1s[i]]
         keys = last_info.keys()
         if len(keys)>0:
             bbids,basks = cy_parse_dict(last_info)
@@ -289,10 +294,10 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
                 top5ask_symbols[i][j] = basks[j][1][0]
                 top5asks[i][j*2] = basks[j][0]*-1
                 top5asks[i][j*2+1] = basks[j][1][1]
-    print 'Encountered %d null values and threw out due to delta limits %d values' % (null_count,throwout_count)
-    top5bids_df = pd.DataFrame(top5bids,columns = ['BidPrice5','BidSize5','BidPrice4','BidSize4','BidPrice3','BidSize3','BidPrice2','BidSize2','BidPrice1','BidSize1'])
+    print 'Encountered %d null values and threw out due to delta limits %d values encountering %d redundant pieces' % (null_count,throwout_count,redundant_count)
+    top5bids_df = pd.DataFrame(top5bids,columns = ['BidSize1','BidPrice1','BidSize2','BidPrice2','BidSize3','BidPrice3','BidSize4','BidPrice4','BidSize5','BidPrice5'])
     top5asks_df = pd.DataFrame(top5asks,columns=['AskPrice1','AskSize1','AskPrice2','AskSize2','AskPrice3','AskSize3','AskPrice4','AskSize4','AskPrice5','AskSize5'])
-    top5bid_symbols_df = pd.DataFrame(top5bid_symbols,columns=['BidSymbol5','BidSymbol4','BidSymbol3','BidSymbol2','BidSymbol1'])
+    top5bid_symbols_df = pd.DataFrame(top5bid_symbols,columns=['BidSymbol1','BidSymbol2','BidSymbol3','BidSymbol4','BidSymbol5'])
     top5ask_symbols_df = pd.DataFrame(top5ask_symbols,columns=['AskSymbol1','AskSymbol2','AskSymbol3','AskSymbol4','AskSymbol5'])
     df =  top5bid_symbols_df.join(top5bids_df).join(top5ask_symbols_df).join(top5asks_df)
-    return df.fillna(method='ffill')    
+    return df.fillna(method='ffill').drop_duplicates()
