@@ -43,6 +43,36 @@ def implied_vol(double underlying, double price, double strike, double t, double
 
 @cython.cdivision(True)
 @cython.boundscheck(False)
+def deltas(np.ndarray[DTYPE_t, ndim=1] underlyings,
+    np.ndarray[DTYPE_t, ndim=1] strikes,
+    np.ndarray[DTYPE_t, ndim=1] vols, np.ndarray[DTYPE_t, ndim=1] ttes, np.ndarray[long, ndim=1] types,
+    double rf):
+    
+    cdef:
+        long und_len = underlyings.shape[0]
+        long strike_len = strikes.shape[0]
+        long vols_len = vols.shape[0]
+        long tte_len = ttes.shape[0]
+        long type_len = types.shape[0]
+        long i=0
+        double last_underlying,approx_delta
+    assert(und_len == strike_len)
+    assert(strike_len==vols_len)
+    assert(vols_len==tte_len)
+    assert(tte_len==type_len)
+
+    cdef np.ndarray[DTYPE_t, ndim=1] res = np.zeros(und_len, dtype=np.double) * np.NaN
+
+    for i in range(0,und_len):
+        last_underlying = underlyings[i]
+        if last_underlying>0:
+            res[i] = delta(last_underlying,strikes[i],ttes[i],vols[i],rf,types[i])
+        else:
+            res[i] = np.NaN
+    return res
+
+@cython.cdivision(True)
+@cython.boundscheck(False)
 def implied_fut(double guess, double price, double strike, double t, double rf, double sigma, double cp):
     cdef long i
     cdef double prices_guess, underlying_guess = guess
@@ -277,7 +307,7 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
             last_info[sym] = [np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN]
             throwout_count+=1
             continue
-        if np.allclose(last_md[sym],[bid1[i],bid1s[i],ask1[i],ask1s[i]]):
+        if last_md.has_key(sym) and np.allclose(last_md[sym],[bid1[i],bid1s[i],ask1[i],ask1s[i]]):
             redundant_count+=1
             continue
         last_info[sym] = implied_info(types[i],bid1[i],bid1s[i],bid2[i],bid2s[i],ask1[i],ask1s[i],ask2[i],ask2s[i],synthetics[i],
@@ -295,7 +325,7 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
                 top5asks[i][j*2] = basks[j][0]*-1
                 top5asks[i][j*2+1] = basks[j][1][1]
     print 'Encountered %d null values and threw out due to delta limits %d values encountering %d redundant pieces' % (null_count,throwout_count,redundant_count)
-    top5bids_df = pd.DataFrame(top5bids,columns = ['BidSize1','BidPrice1','BidSize2','BidPrice2','BidSize3','BidPrice3','BidSize4','BidPrice4','BidSize5','BidPrice5'])
+    top5bids_df = pd.DataFrame(top5bids,columns=['BidPrice1','BidSize1','BidPrice2','BidSize2','BidPrice3','BidSize3','BidPrice4','BidSize4','BidPrice5','BidSize5'])
     top5asks_df = pd.DataFrame(top5asks,columns=['AskPrice1','AskSize1','AskPrice2','AskSize2','AskPrice3','AskSize3','AskPrice4','AskSize4','AskPrice5','AskSize5'])
     top5bid_symbols_df = pd.DataFrame(top5bid_symbols,columns=['BidSymbol1','BidSymbol2','BidSymbol3','BidSymbol4','BidSymbol5'])
     top5ask_symbols_df = pd.DataFrame(top5ask_symbols,columns=['AskSymbol1','AskSymbol2','AskSymbol3','AskSymbol4','AskSymbol5'])
