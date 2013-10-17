@@ -171,10 +171,10 @@ cdef double approximate_abs_delta(long opt_type, double underlying,double strike
 cdef int no_md(double bid1,double ask1):
     return not (bid1>0 and ask1>0)
 
-cdef int throwout(long opt_type,double approx_delta):
+cdef int throwout(long opt_type,double approx_delta,double threshold):
     if opt_type==0:
         return 0
-    return approx_delta < .2
+    return approx_delta < threshold
 
 cdef int no_underlying(double und):
     return not und>0
@@ -185,7 +185,8 @@ def implied_info(long opt_type,double bid1,double bid1s,double bid2,double bid2s
     if opt_type == 0:
         return np.array([bid1,bid1s,bid2,bid2s,ask1,ask1s,ask2,ask2s])
     
-    
+    cdef:
+        double vol_error = vol*.001
     
     if opt_type == 1:
         res[1] = bid1s*approx_delta
@@ -196,19 +197,19 @@ def implied_info(long opt_type,double bid1,double bid1s,double bid2,double bid2s
         if res[1]<1:
             res[0] = 0
         else:
-            res[0] = implied_fut(synthetic,bid1,strike,tte,rf,vol,opt_type) - basis
+            res[0] = implied_fut(synthetic,bid1,strike,tte,rf,vol+vol_error,opt_type) - basis
         if res[3]<1:
             res[2]  = 0
         else:
-            res[2] = implied_fut(synthetic,bid2,strike,tte,rf,vol,opt_type) - basis
+            res[2] = implied_fut(synthetic,bid2,strike,tte,rf,vol+vol_error,opt_type) - basis
         if res[5]<1:
             res[4] = 999999
         else:
-            res[4] = implied_fut(synthetic,ask1,strike,tte,rf,vol,opt_type) - basis
+            res[4] = implied_fut(synthetic,ask1,strike,tte,rf,vol-vol_error,opt_type) - basis
         if res[7]<1:
             res[6] = 999999
         else:
-            res[6] = implied_fut(synthetic,ask2,strike,tte,rf,vol,opt_type) - basis
+            res[6] = implied_fut(synthetic,ask2,strike,tte,rf,vol-vol_error,opt_type) - basis
         
     elif opt_type == -1:
         res[1] = ask1s*approx_delta
@@ -219,19 +220,19 @@ def implied_info(long opt_type,double bid1,double bid1s,double bid2,double bid2s
         if res[1]<1:
             res[0] = 0
         else:
-            res[0] = implied_fut(synthetic,ask1,strike,tte,rf,vol,opt_type) - basis
+            res[0] = implied_fut(synthetic,ask1,strike,tte,rf,vol-vol_error,opt_type) - basis
         if res[3]<1:
             res[2]  = 0
         else:
-            res[2] = implied_fut(synthetic,ask2,strike,tte,rf,vol,opt_type) - basis
+            res[2] = implied_fut(synthetic,ask2,strike,tte,rf,vol-vol_error,opt_type) - basis
         if res[5]<1:
             res[4] = 999999
         else:
-            res[4] = implied_fut(synthetic,bid1,strike,tte,rf,vol,opt_type) - basis
+            res[4] = implied_fut(synthetic,bid1,strike,tte,rf,vol+vol_error,opt_type) - basis
         if res[7]<1:
             res[6] = 999999
         else:
-            res[6] = implied_fut(synthetic,bid2,strike,tte,rf,vol,opt_type) - basis
+            res[6] = implied_fut(synthetic,bid2,strike,tte,rf,vol+vol_error,opt_type) - basis
         
         
     
@@ -282,7 +283,7 @@ def cy_parse_dict(some_res_dict):
 def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] bid1,np.ndarray[long, ndim=1] bid1s,np.ndarray[DTYPE_t, ndim=1] bid2,
         np.ndarray[long, ndim=1] bid2s,np.ndarray[DTYPE_t, ndim=1] ask1,np.ndarray[long, ndim=1] ask1s,np.ndarray[DTYPE_t, ndim=1] ask2,
         np.ndarray[long, ndim=1] ask2s,np.ndarray[DTYPE_t, ndim=1] synthetics,np.ndarray[DTYPE_t, ndim=1] basis,np.ndarray[DTYPE_t, ndim=1] vols,
-        np.ndarray[DTYPE_t, ndim=1] ttes,np.ndarray[DTYPE_t, ndim=1] strikes,np.ndarray[long, ndim=1] types,double rf, double guess):
+        np.ndarray[DTYPE_t, ndim=1] ttes,np.ndarray[DTYPE_t, ndim=1] strikes,np.ndarray[long, ndim=1] types,double rf, double guess,double thresh):
     cdef:
         long sym_len = len(syms)
         double approx_delta
@@ -303,7 +304,7 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
             continue
 
         approx_delta = approximate_abs_delta(types[i],synthetics[i],strikes[i],ttes[i],vols[i],rf)
-        if throwout(types[i],approx_delta):
+        if throwout(types[i],approx_delta,thresh):
             last_info[sym] = [np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN]
             throwout_count+=1
             continue
