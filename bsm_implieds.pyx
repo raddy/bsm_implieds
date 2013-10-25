@@ -65,6 +65,9 @@ def deltas(np.ndarray[DTYPE_t, ndim=1] underlyings,
 
     for i in range(0,und_len):
         last_underlying = underlyings[i]
+        if types[i] == 0:
+            res[i] = 1
+            continue
         if last_underlying>0:
             res[i] = delta(last_underlying,strikes[i],ttes[i],vols[i],rf,types[i])
         else:
@@ -125,9 +128,9 @@ def implied_futs(np.ndarray[DTYPE_t, ndim=1] prices,np.ndarray[DTYPE_t, ndim=1] 
 
 
     for i in range(0,price_len):
-        if (prices[i]>=0) and  (vols[i]>0) and types[i]!=0:
+        if (prices[i]>0) and  (vols[i]>0) and types[i]!=0:
             res[i] = implied_fut(guess,prices[i],strikes[i],ttes[i],rf,vols[i],types[i])
-        elif prices[i]>=0 and types[i]==0:
+        elif prices[i]>0 and types[i]==0:
             res[i] = prices[i]
         else:
             res[i] = np.NaN
@@ -271,11 +274,11 @@ def cy_parse_dict(some_res_dict):
         if stuff[0]>0:
             topbids.feed((stuff[0], (k,stuff[1])))
         if stuff[2]>0:
-            topbids.feed((stuff[2], (k,stuff[1])))
+            topbids.feed((stuff[2], (k,stuff[3])))
         if stuff[4]>0:
-            topasks.feed((stuff[4]*-1, (k,stuff[1])))
+            topasks.feed((stuff[4]*-1, (k,stuff[5])))
         if stuff[6]>0:
-            topasks.feed((stuff[6]*-1, (k,stuff[1])))
+            topasks.feed((stuff[6]*-1, (k,stuff[7])))
     return [topbids.result(),topasks.result()]  
 
 #assumes you pass in ONLY KOPSI message 
@@ -304,16 +307,17 @@ def fast_implieds(np.ndarray[object, ndim=1] syms, np.ndarray[DTYPE_t, ndim=1] b
             continue
 
         approx_delta = approximate_abs_delta(types[i],synthetics[i],strikes[i],ttes[i],vols[i],rf)
+        
+        if last_md.has_key(sym) and np.allclose(last_md[sym],[bid1[i],bid1s[i],ask1[i],ask1s[i],bid2[i],bid2s[i],ask2[i],ask2s[i]]):
+            redundant_count+=1
+            continue
         if throwout(types[i],approx_delta,thresh):
             last_info[sym] = [np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN]
             throwout_count+=1
-            continue
-        if last_md.has_key(sym) and np.allclose(last_md[sym],[bid1[i],bid1s[i],ask1[i],ask1s[i]]):
-            redundant_count+=1
-            continue
-        last_info[sym] = implied_info(types[i],bid1[i],bid1s[i],bid2[i],bid2s[i],ask1[i],ask1s[i],ask2[i],ask2s[i],synthetics[i],
+        else:
+            last_info[sym] = implied_info(types[i],bid1[i],bid1s[i],bid2[i],bid2s[i],ask1[i],ask1s[i],ask2[i],ask2s[i],synthetics[i],
             basis[i],vols[i],ttes[i],strikes[i],approx_delta,rf,guess)
-        last_md[sym] = [bid1[i],bid1s[i],ask1[i],ask1s[i]]
+            last_md[sym] = [bid1[i],bid1s[i],ask1[i],ask1s[i],bid2[i],bid2s[i],ask2[i],ask2s[i]]
         keys = last_info.keys()
         if len(keys)>0:
             bbids,basks = cy_parse_dict(last_info)
