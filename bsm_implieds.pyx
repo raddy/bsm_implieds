@@ -23,6 +23,10 @@ cdef inline int trade_dir(double prev_bid,double trade_price):
 def bs_tv(double s, double k, double t,double v, double rf, double cp):
     return tv(s,k,t,v,rf,cp)
 
+def delta_py(double s, double k, double t,double v, double rf, double cp):
+    return delta(s,k,t,v,rf,cp)
+
+
 @cython.cdivision(True)
 @cython.boundscheck(False)
 def implied_vol(double underlying, double price, double strike, double t, double rf, double cp):
