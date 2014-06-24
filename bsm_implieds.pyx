@@ -26,6 +26,8 @@ def bs_tv(double s, double k, double t,double v, double rf, double cp):
 def delta_py(double s, double k, double t,double v, double rf, double cp):
     return delta(s,k,t,v,rf,cp)
 
+def vega_py(double s, double k, double t,double v, double rf, double cp):
+    return vega(s,k,t,v,rf,cp)
 
 @cython.cdivision(True)
 @cython.boundscheck(False)
